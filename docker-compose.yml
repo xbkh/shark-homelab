@@ -1,0 +1,25 @@
+services:
+  dockerproxy:
+    image: tecnativa/docker-socket-proxy:latest
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      POST: 1
+      ALLOW_RESTARTS: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+  shark:
+    build: .
+    image: shark-app:latest
+    restart: unless-stopped
+    depends_on: [dockerproxy]
+    env_file: .env
+    ports:
+      - '100.121.189.251:7070:7070'
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - /etc/hostname:/host/rootfs:ro
+      - /mnt:/host/mnt:ro,rslave
+      - ./config.json:/srv/config.json:ro
+      - ./app/static:/srv/app/static:ro
