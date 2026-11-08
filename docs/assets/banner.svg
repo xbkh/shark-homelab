@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 300" role="img" aria-label="Home Lab">
+  <title>Home Lab</title>
+  <rect width="1280" height="300" fill="#0a0a0b"/>
+  <path d="M0 0h1280v300H0z" fill="none" stroke="#2a2a2e" stroke-width="2"/>
+  <path d="M1280 0v110L1170 0z" fill="#ffd400"/>
+  <path d="M0 300v-70l70 70z" fill="#ffd400"/>
+  <g transform="translate(90 60) scale(3.1)">
+    <rect width="64" height="64" rx="14" fill="#141416" stroke="#ffd400" stroke-width="1.2"/>
+    <path d="M9 45c7-1 11-6 13-14 2-9 9-15 20-17-3 6-4 12-1 17 3 2 7 7 8 13-7-3-12-3-18 0-5 2-11 3-22 1z" fill="#ffd400"/>
+  </g>
+  <text x="330" y="150" fill="#ffd400" font-family="Saira, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="112" font-weight="800" letter-spacing="2">HOME LAB</text>
+  <text x="334" y="203" fill="#e9e9ec" font-family="'Hanken Grotesk', 'Segoe UI', Helvetica, Arial, sans-serif" font-size="30">Monitoring, private VPN, cloud and game streaming</text>
+  <g fill="#ffd400">
+    <rect x="334" y="236" width="34" height="10" rx="2"/><rect x="376" y="236" width="34" height="10" rx="2"/>
+    <rect x="418" y="236" width="34" height="10" rx="2"/><rect x="460" y="236" width="34" height="10" rx="2"/>
+    <rect x="502" y="236" width="34" height="10" rx="2" opacity=".35"/><rect x="544" y="236" width="34" height="10" rx="2" opacity=".35"/>
+  </g>
+</svg>

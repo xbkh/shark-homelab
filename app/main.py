@@ -17,7 +17,10 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 BASE = Path(__file__).parent
-CONFIG = json.loads((BASE.parent / "config.json").read_text())
+DEMO = os.environ.get("SHARK_DEMO") == "1"   # sample data, no server or VPN needed
+CONFIG = json.loads(Path(os.environ.get("SHARK_CONFIG") or BASE.parent / "config.json").read_text())
+if DEMO:
+    from . import demo
 PASSWORD = os.environ.get("SHARK_PASSWORD", "")
 SECRET = (os.environ.get("SHARK_SECRET") or secrets.token_hex(32)).encode()
 NETBIRD_TOKEN = os.environ.get("NETBIRD_API_TOKEN", "")
@@ -112,6 +115,8 @@ def _net_rate() -> tuple[float, float]:
 
 
 def snapshot() -> dict:
+    if DEMO:
+        return demo.snapshot()
     vm = psutil.virtual_memory()
     rx, tx = _net_rate()
     load = os.getloadavg()
@@ -141,12 +146,17 @@ async def sampler():
 @app.on_event("startup")
 async def _startup():
     snapshot()
+    if DEMO:
+        HISTORY.extend(demo.history())
     asyncio.create_task(sampler())
-    asyncio.create_task(alerter())
-    asyncio.create_task(heartbeat())
+    if not DEMO:
+        asyncio.create_task(alerter())
+        asyncio.create_task(heartbeat())
 
 
 def disks() -> list[dict]:
+    if DEMO:
+        return demo.disks()
     out = []
     for d in CONFIG["disks"]:
         p = d["path"]
@@ -163,6 +173,8 @@ def disks() -> list[dict]:
 
 # ---------- Services et conteneurs ----------
 async def check_service(client: httpx.AsyncClient, svc: dict) -> dict:
+    if DEMO:
+        return demo.service_state(svc)
     t0 = time.time()
     ok, code = False, None
     try:
@@ -176,6 +188,8 @@ async def check_service(client: httpx.AsyncClient, svc: dict) -> dict:
 
 
 async def containers() -> list[dict]:
+    if DEMO:
+        return demo.containers()
     try:
         async with httpx.AsyncClient(timeout=4) as c:
             r = await c.get(f"{DOCKER_URL}/containers/json", params={"all": 1})
@@ -306,6 +320,8 @@ async def heartbeat():
 
 @app.get("/api/notify", dependencies=[Depends(require_auth)])
 async def notify_status():
+    if DEMO:
+        return {"configured": True, "server": NTFY_URL, "topic": "shark-demo"}
     return {"configured": bool(NTFY_TOPIC), "server": NTFY_URL, "topic": NTFY_TOPIC}
 
 
@@ -338,6 +354,8 @@ async def container_logs(name: str, tail: int = 200):
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
         raise HTTPException(status_code=400, detail="nom invalide")
     tail = max(10, min(tail, 1000))
+    if DEMO:
+        return {"name": name, "log": demo.logs(name)}
     async with httpx.AsyncClient(timeout=15) as c:
         r = await c.get(f"{DOCKER_URL}/containers/{name}/logs",
                         params={"stdout": 1, "stderr": 1, "tail": tail, "timestamps": 1})
@@ -370,6 +388,8 @@ def _dir_size(p: Path) -> int:
 
 
 def backups_info() -> dict:
+    if DEMO:
+        return demo.backups()
     now = time.time()
     if _backup_cache["data"] and now - _backup_cache["t"] < 300:
         return _backup_cache["data"]
@@ -395,6 +415,8 @@ async def backups():
 # ---------- VPN (NetBird) ----------
 @app.get("/api/vpn", dependencies=[Depends(require_auth)])
 async def vpn():
+    if DEMO:
+        return demo.vpn()
     if not NETBIRD_TOKEN:
         return {"configured": False, "peers": []}
     try:
