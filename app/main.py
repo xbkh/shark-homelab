@@ -211,6 +211,9 @@ def build_checks(s: dict, ds: list, svcs: list, cts: list) -> list[dict]:
     for c in cts:
         if c["state"] != "running":
             add("crit", f"Conteneur « {c['name']} » arrêté ({c['status']})")
+    b = _backup_cache["data"]
+    if b and b.get("available") and b.get("last") and not b.get("in_progress") and b["last"]["age_h"] > 72:
+        add("warn", f"Aucune sauvegarde du TUF depuis {int(b['last']['age_h'] // 24)} jours")
     if not checks:
         add("ok", "Tout est en ordre")
     return checks
@@ -219,6 +222,7 @@ def build_checks(s: dict, ds: list, svcs: list, cts: list) -> list[dict]:
 async def collect(s: dict | None = None) -> dict:
     s = s or snapshot()
     ds = disks()
+    await asyncio.to_thread(backups_info)   # remplit le cache utilise par les verifications
     async with httpx.AsyncClient(verify=False) as client:
         svcs, cts = await asyncio.gather(
             asyncio.gather(*[check_service(client, v) for v in CONFIG["services"]]),
@@ -327,6 +331,65 @@ async def restart_container(name: str):
     if r.status_code >= 300:
         raise HTTPException(status_code=502, detail=f"docker a repondu {r.status_code}")
     return {"ok": True}
+
+
+@app.get("/api/containers/{name}/logs", dependencies=[Depends(require_auth)])
+async def container_logs(name: str, tail: int = 200):
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
+        raise HTTPException(status_code=400, detail="nom invalide")
+    tail = max(10, min(tail, 1000))
+    async with httpx.AsyncClient(timeout=15) as c:
+        r = await c.get(f"{DOCKER_URL}/containers/{name}/logs",
+                        params={"stdout": 1, "stderr": 1, "tail": tail, "timestamps": 1})
+    if r.status_code >= 300:
+        raise HTTPException(status_code=502, detail=f"docker a repondu {r.status_code}")
+    raw, out, i = r.content, [], 0
+    # flux Docker multiplexe : 8 octets d'en-tete (type, 0, 0, 0, taille) puis la charge utile
+    while i + 8 <= len(raw) and raw[i] in (0, 1, 2) and raw[i + 1:i + 4] == b"\x00\x00\x00":
+        size = int.from_bytes(raw[i + 4:i + 8], "big")
+        out.append(raw[i + 8:i + 8 + size].decode("utf-8", "replace"))
+        i += 8 + size
+    text = "".join(out) if out else raw.decode("utf-8", "replace")
+    return {"name": name, "log": text[-60000:]}
+
+
+# ---------- Sauvegardes du TUF (dossier monte en lecture seule) ----------
+BACKUP_DIR = Path("/host/backups/tuf")
+_backup_cache: dict = {"t": 0, "data": None}
+
+
+def _dir_size(p: Path) -> int:
+    total = 0
+    for root, _, files in os.walk(p):
+        for f in files:
+            try:
+                total += os.lstat(os.path.join(root, f)).st_size
+            except OSError:
+                pass
+    return total
+
+
+def backups_info() -> dict:
+    now = time.time()
+    if _backup_cache["data"] and now - _backup_cache["t"] < 300:
+        return _backup_cache["data"]
+    info = {"available": BACKUP_DIR.is_dir(), "snapshots": [], "in_progress": None, "last": None}
+    if info["available"]:
+        snaps = sorted([d for d in BACKUP_DIR.iterdir() if d.is_dir() and re.fullmatch(r"\d{4}-\d{2}-\d{2}", d.name)])
+        info["snapshots"] = [d.name for d in snaps][-14:]
+        if snaps:
+            last = snaps[-1]
+            info["last"] = {"name": last.name, "age_h": round((now - last.stat().st_mtime) / 3600, 1)}
+        ip = BACKUP_DIR / "in-progress"
+        if ip.is_dir():
+            info["in_progress"] = {"size": _dir_size(ip), "age_h": round((now - ip.stat().st_mtime) / 3600, 1)}
+    _backup_cache.update(t=now, data=info)
+    return info
+
+
+@app.get("/api/backups", dependencies=[Depends(require_auth)])
+async def backups():
+    return await asyncio.to_thread(backups_info)
 
 
 # ---------- VPN (NetBird) ----------

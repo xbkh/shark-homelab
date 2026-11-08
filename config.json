@@ -2,16 +2,68 @@
   "name": "Shark",
   "host_ip": "100.121.189.251",
   "services": [
-    {"name": "Nextcloud", "group": "Cloud", "check": "http://100.121.189.251:8080/status.php", "link": "http://100.121.189.251:8080", "icon": "☁️"},
-    {"name": "Immich", "group": "Cloud", "check": "http://100.121.189.251:2283/api/server/ping", "link": "http://100.121.189.251:2283", "icon": "🖼️"},
-    {"name": "Sunshine", "group": "Streaming", "check": "https://100.121.189.251:47990", "link": "https://100.121.189.251:47990", "icon": "🎮"},
-    {"name": "Beszel", "group": "Supervision", "check": "http://100.121.189.251:8090", "link": "http://100.121.189.251:8090", "icon": "📈"},
-    {"name": "Homepage", "group": "Supervision", "check": "http://100.121.189.251:3000", "link": "http://100.121.189.251:3000", "icon": "🏠"},
-    {"name": "Cockpit", "group": "Administration", "check": "https://100.121.189.251:9090", "link": "https://100.121.189.251:9090", "icon": "🛠️"}
+    {
+      "name": "Nextcloud",
+      "group": "Cloud",
+      "check": "http://100.121.189.251:8080/status.php",
+      "link": "http://100.121.189.251:8080",
+      "icon": "☁️"
+    },
+    {
+      "name": "Immich",
+      "group": "Cloud",
+      "check": "http://100.121.189.251:2283/api/server/ping",
+      "link": "http://100.121.189.251:2283",
+      "icon": "🖼️"
+    },
+    {
+      "name": "Sunshine",
+      "group": "Streaming",
+      "check": "https://100.121.189.251:47990",
+      "link": "https://100.121.189.251:47990",
+      "icon": "🎮"
+    },
+    {
+      "name": "Beszel",
+      "group": "Supervision",
+      "check": "http://100.121.189.251:8090",
+      "link": "http://100.121.189.251:8090",
+      "icon": "📈"
+    },
+    {
+      "name": "Homepage",
+      "group": "Supervision",
+      "check": "http://100.121.189.251:3000",
+      "link": "http://100.121.189.251:3000",
+      "icon": "🏠"
+    },
+    {
+      "name": "AdGuard Home",
+      "group": "Réseau",
+      "check": "http://100.121.189.251:3001/login.html",
+      "link": "http://100.121.189.251:3001",
+      "icon": ""
+    },
+    {
+      "name": "Cockpit",
+      "group": "Administration",
+      "check": "https://100.121.189.251:9090",
+      "link": "https://100.121.189.251:9090",
+      "icon": "🛠️"
+    }
   ],
   "disks": [
-    {"name": "Système (NVMe)", "path": "/host/rootfs"},
-    {"name": "SSD jeux", "path": "/host/mnt/jeux"},
-    {"name": "SSD données", "path": "/host/mnt/donnees"}
+    {
+      "name": "Système (NVMe)",
+      "path": "/host/rootfs"
+    },
+    {
+      "name": "SSD jeux",
+      "path": "/host/mnt/jeux"
+    },
+    {
+      "name": "SSD données",
+      "path": "/host/mnt/donnees"
+    }
   ]
 }

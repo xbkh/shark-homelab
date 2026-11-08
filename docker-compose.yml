@@ -23,3 +23,4 @@ services:
       - /mnt:/host/mnt:ro,rslave
       - ./config.json:/srv/config.json:ro
       - ./app/static:/srv/app/static:ro
+      - ${BACKUPS_DIR:-./backups}:/host/backups:ro

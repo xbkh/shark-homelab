@@ -10,9 +10,9 @@ Shark runs as two small containers on the home server, is reachable only through
 
 - **Overview**: live CPU, memory, temperature and network meters, one-hour history, disk usage.
 - **Services**: health checks (HTTP) for every service you configure, with direct links.
-- **Containers**: list of Docker containers with one-tap restart, through a restricted Docker socket proxy.
+- **Containers**: list of Docker containers with one-tap restart and a log viewer, through a restricted Docker socket proxy.
 - **VPN**: connection guide and, with a NetBird API token, the list of peers and their state.
-- **Cloud**: status of Nextcloud and Immich and free space.
+- **Cloud**: status of Nextcloud and Immich, free space, and the state of the nightly backup snapshots.
 - **Streaming**: Moonlight/Sunshine quick start and a link to the Cockpit web terminal.
 - **Alerts**: automatic checks (full disk, memory, temperature, service or container down) with push notifications through [ntfy](https://ntfy.sh).
 - **Dead man's switch**: optional heartbeat to [Healthchecks.io](https://healthchecks.io) so you are alerted when the whole server goes offline.
@@ -40,6 +40,7 @@ See [docs/deployment.md](docs/deployment.md) for details and [docs/architecture.
 | `NETBIRD_API_TOKEN` | no | Lists NetBird peers in the VPN page |
 | `NTFY_TOPIC` | no | Enables push alerts (use a long random topic, it acts as a password) |
 | `HEALTHCHECK_URL` | no | Healthchecks.io ping URL, pinged every minute |
+| `BACKUPS_DIR` | no | Host folder with backup snapshots, mounted read-only to show their status |
 
 Services and disks are defined in [`config.json`](config.json).
 

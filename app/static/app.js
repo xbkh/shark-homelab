@@ -9,7 +9,7 @@ const gb = b => (b / 1e9).toFixed(b >= 1e11 ? 0 : 1).replace(".", ",") + " Go";
 const rate = b => b > 1e6 ? (b / 1e6).toFixed(1).replace(".", ",") + " Mo/s" : Math.round(b / 1e3) + " Ko/s";
 const dur = s => { const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return (d ? d + " j " : "") + (d || h ? h + " h " : "") + m + " min"; };
 const lv = p => p >= 90 ? "bad" : p >= 78 ? "warn" : "";
-const SVC_ICON = { Nextcloud: "folder-open", Immich: "image", Sunshine: "radio-tower", Beszel: "activity", Homepage: "layout-dashboard", Cockpit: "terminal" };
+const SVC_ICON = { Nextcloud: "folder-open", Immich: "image", Sunshine: "radio-tower", Beszel: "activity", Homepage: "layout-dashboard", Cockpit: "terminal", "AdGuard Home": "shield-check" };
 const OS_ICON = o => /android|ios|iphone/i.test(o || "") ? "smartphone" : /linux|windows|mac/i.test(o || "") ? "laptop" : "server";
 
 const TABS = [["home", "layout-dashboard", "Aperçu"], ["services", "blocks", "Services"], ["vpn", "shield-check", "VPN"], ["cloud", "cloud", "Cloud"], ["stream", "monitor-play", "Streaming"], ["alerts", "bell", "Alertes"]];
@@ -22,7 +22,7 @@ const TITLES = {
   alerts: ["Alertes", "Les vérifications automatiques, mises à jour toutes les 10 secondes."],
 };
 let tab = location.hash.slice(1) in TITLES ? location.hash.slice(1) : "home";
-let data = null, hist = [], vpn = null, notif = null, timer = null;
+let data = null, hist = [], vpn = null, notif = null, backups = null, timer = null;
 
 async function api(path, opts = {}) {
   const r = await fetch(path, { credentials: "same-origin", headers: { "Content-Type": "application/json" }, ...opts });
@@ -106,7 +106,7 @@ function pageServices() {
     `<div class="line"><div class="tile">${ic(SVC_ICON[s.name] || "server")}</div><div class="txt"><b>${esc(s.name)}</b><span>${s.up ? "En ligne · " + s.ms + " ms" : "Ne répond pas"}</span></div><span class="sdot ${s.up ? "ok" : "bad"}"></span><a class="iconbtn" href="${esc(s.link)}" target="_blank" rel="noopener" aria-label="Ouvrir ${esc(s.name)}">${ic("external-link", "sm")}</a></div>`).join("") + `</div></section>`).join("");
   const ct = data.containers.length ? data.containers.map(c => {
     const prot = /^shark|dockerproxy/.test(c.name);
-    return `<div class="line"><div class="tile">${ic("container")}</div><div class="txt"><b>${esc(c.name)}</b><span>${esc(c.status)}</span></div><span class="sdot ${c.state === "running" ? "ok" : "bad"}"></span>${prot ? "" : `<button class="iconbtn" data-restart="${esc(c.name)}" aria-label="Redémarrer ${esc(c.name)}" title="Redémarrer">${ic("rotate-cw", "sm")}</button>`}</div>`;
+    return `<div class="line"><div class="tile">${ic("container")}</div><div class="txt"><b>${esc(c.name)}</b><span>${esc(c.status)}</span></div><span class="sdot ${c.state === "running" ? "ok" : "bad"}"></span><button class="iconbtn" data-logs="${esc(c.name)}" aria-label="Journaux de ${esc(c.name)}" title="Journaux">${ic("terminal", "sm")}</button>${prot ? "" : `<button class="iconbtn" data-restart="${esc(c.name)}" aria-label="Redémarrer ${esc(c.name)}" title="Redémarrer">${ic("rotate-cw", "sm")}</button>`}</div>`;
   }).join("") : `<div class="note">${ic("info", "sm")}<span>Aucun conteneur détecté.</span></div>`;
   return `<div class="stack"><div class="grid g2">${gh}</div><section class="panel"><h2>${ic("container")}Conteneurs Docker<span class="tail">${data.containers.filter(c => c.state === "running").length}/${data.containers.length} actifs</span></h2><div class="rows">${ct}</div></section></div>`;
 }
@@ -125,6 +125,18 @@ function pageVpn() {
   return `<div class="grid g2"><section class="panel hot"><h2>${ic("shield-check")}Appareils du réseau</h2>${peers}</section>${how}</div>`;
 }
 
+function backupView() {
+  if (!backups) return `<div class="note">${ic("clock", "sm")}<span>Chargement…</span></div>`;
+  if (!backups.available) return `<div class="note">${ic("info", "sm")}<span>Aucun dossier de sauvegarde n'est relié à Shark.</span></div>`;
+  const last = backups.last, ip = backups.in_progress;
+  const ago = h => h < 1 ? "il y a moins d'une heure" : h < 48 ? `il y a ${Math.round(h)} h` : `il y a ${Math.round(h / 24)} jours`;
+  const rows = [
+    `<div class="line"><div class="tile">${ic("circle-check")}</div><div class="txt"><b>${last ? "Dernière copie complète : " + esc(last.name) : "Aucune copie complète pour l'instant"}</b><span>${last ? ago(last.age_h) : "La première copie est en cours ou n'a pas encore tourné."}</span></div>${last ? `<span class="tag ok">${last.age_h > 72 ? "Ancienne" : "À jour"}</span>` : ""}</div>`,
+    ip ? `<div class="line"><div class="tile">${ic("refresh-cw")}</div><div class="txt"><b>Copie en cours</b><span>${gb(ip.size)} déjà envoyés, la copie reprend chaque nuit vers 3 h 30</span></div><span class="tag y">En cours</span></div>` : "",
+  ].join("");
+  return `<div class="rows">${rows}</div><p class="muted" style="margin-top:12px;font-size:13px">${backups.snapshots.length} version${backups.snapshots.length > 1 ? "s" : ""} conservée${backups.snapshots.length > 1 ? "s" : ""} (14 maximum). La copie tourne chaque nuit vers 3 h 30.</p>`;
+}
+
 function pageCloud() {
   const nc = data.services.find(s => s.name === "Nextcloud"), im = data.services.find(s => s.name === "Immich"), d = data.disks[0];
   const tile = (s, icon, title, desc) => `<section class="panel"><h2>${ic(icon)}${title}<span class="tail"><span class="tag ${s && s.up ? "ok" : "bad"}">${s && s.up ? "En ligne" : "Hors ligne"}</span></span></h2><p class="muted" style="margin-bottom:16px">${desc}</p>${s ? `<a class="btn" href="${esc(s.link)}" target="_blank" rel="noopener">Ouvrir ${esc(s.name)} ${ic("external-link", "sm")}</a>` : ""}</section>`;
@@ -135,6 +147,7 @@ function pageCloud() {
   <div class="grid g2">
     <section class="panel"><h2>${ic("database")}Espace disponible</h2>${d && d.mounted ? `<div class="meter"><div class="top"><span>Disque du cloud</span><b>${gb(d.total - d.used)}<small>libres</small></b></div><div class="led ${lv(d.percent)}" style="--p:${d.percent}%"></div></div><p class="muted" style="margin-top:12px">${gb(d.used)} utilisés sur ${gb(d.total)}.</p>` : `<div class="note">${ic("info", "sm")}<span>Disque indisponible.</span></div>`}</section>
     <section class="panel"><h2>${ic("shield-check")}Sauvegarde du cloud</h2><div class="note">${ic("triangle-alert", "sm")}<span>Ton cloud n'a qu'une seule copie, sur le disque du Sharkoon. Garde une autre copie de tout ce qui compte tant qu'une sauvegarde automatique n'est pas en place.</span></div></section>
+    <section class="panel span2"><h2>${ic("database")}Sauvegarde des documents du TUF</h2>${backupView()}</section>
   </div></div>`;
 }
 
@@ -179,11 +192,12 @@ function render() {
     <div><div class="mtop"><div class="brand">${FIN}<b>SHARK</b></div><span class="live"><i></i>En direct</span></div>
     <main><div class="pagehead"><div><h1>${title}</h1><p>${sub}</p></div><span class="live"><i></i>En direct</span></div>${(PAGES[tab] || pageHome)()}</main></div>
     <nav class="tabbar" aria-label="Navigation">${bar}</nav></div>`;
-  document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; location.hash = tab; if (tab === "vpn") loadVpn(); if (tab === "alerts") loadNotif(); render(); window.scrollTo(0, 0); });
+  document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; location.hash = tab; if (tab === "vpn") loadVpn(); if (tab === "alerts") loadNotif(); if (tab === "cloud") loadBackups(); render(); window.scrollTo(0, 0); });
   document.querySelectorAll("[data-restart]").forEach(b => b.onclick = async () => {
     const name = b.dataset.restart; if (!confirm(`Redémarrer « ${name} » ?`)) return;
     try { await api(`/api/containers/${encodeURIComponent(name)}/restart`, { method: "POST" }); toast(`${name} redémarré`); refresh(); } catch (e) { toast("Échec : " + e.message, "circle-x"); }
   });
+  document.querySelectorAll("[data-logs]").forEach(b => b.onclick = () => showLogs(b.dataset.logs));
   const nt = document.getElementById("notiftest");
   if (nt) nt.onclick = async () => { try { await api("/api/notify/test", { method: "POST" }); toast("Notification envoyée"); } catch (e) { toast("Échec : " + e.message, "circle-x"); } };
   const lo = document.getElementById("logout"); if (lo) lo.onclick = async () => { await api("/api/logout", { method: "POST" }); renderLogin(); };
@@ -194,7 +208,21 @@ async function refresh() {
   catch (e) { if (e.message !== "401" && !data) $app.innerHTML = `<div class="login"><div class="box"><div class="mark">${FIN}<b>SHARK</b></div><div class="alert crit">${ic("circle-x")}<span>Shark est injoignable. Vérifie que le VPN NetBird est actif.</span></div><button class="btn" onclick="location.reload()">Réessayer</button></div></div>`; }
 }
 async function loadVpn() { try { vpn = await api("/api/vpn"); render(); } catch { } }
+async function loadBackups() { try { backups = await api("/api/backups"); render(); } catch { } }
+async function showLogs(name) {
+  const dlg = document.createElement("dialog"); dlg.className = "logs";
+  dlg.innerHTML = `<div class="logs-head"><b>${esc(name)}</b><div><button class="iconbtn" id="logs-refresh" aria-label="Actualiser">${ic("rotate-cw", "sm")}</button> <button class="iconbtn" id="logs-close" aria-label="Fermer">${ic("circle-x", "sm")}</button></div></div><pre id="logs-body">Chargement…</pre>`;
+  document.body.appendChild(dlg); dlg.showModal();
+  const load = async () => {
+    const pre = dlg.querySelector("#logs-body");
+    try { const r = await api(`/api/containers/${encodeURIComponent(name)}/logs?tail=300`); pre.textContent = r.log.trim() || "Aucun journal."; pre.scrollTop = pre.scrollHeight; }
+    catch (e) { pre.textContent = "Impossible de lire les journaux : " + e.message; }
+  };
+  dlg.querySelector("#logs-close").onclick = () => { dlg.close(); dlg.remove(); };
+  dlg.querySelector("#logs-refresh").onclick = load; dlg.addEventListener("cancel", () => dlg.remove());
+  load();
+}
 async function loadNotif() { try { notif = await api("/api/notify"); render(); } catch { } }
-async function start() { clearInterval(timer); await refresh(); if (tab === "vpn") loadVpn(); if (tab === "alerts") loadNotif(); timer = setInterval(refresh, 10000); }
+async function start() { clearInterval(timer); await refresh(); if (tab === "vpn") loadVpn(); if (tab === "alerts") loadNotif(); if (tab === "cloud") loadBackups(); timer = setInterval(refresh, 10000); }
 (async () => { try { const me = await api("/api/me"); me.authenticated ? start() : renderLogin(); } catch { renderLogin(); } })();
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => { });
